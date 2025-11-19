@@ -87,7 +87,61 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].completed = false;
     }
 
+    Process* current_process = NULL;
+    int quantum_counter = 0;
+    int next_arrival_idx = 0;
+    int actual_duration = 0;
+                           //for per simular ticks de cpu i while per encolar
+    for (int t = 0; t < (int)duration; t++){
+                                      
+        while (next_arrival_idx < (int)nprocs && procTable[next_arrival_idx].arrive_time == t){
+            enqueue(&procTable[next_arrival_idx]);
+            next_arrival_idx++;
+        }
+    
+        if (algorithm == FCFS){  //utilitzem els ifs segons quin tipus sigui
+            if (current_process == NULL && get_queue_size() > 0){
+                current_process = dequeue();
+            }
+        }
+        
+        if (current_process != NULL){
+            current_process->lifecycle[t] = Running; //ho necessitem per fer el diagrama (marcar les E en cada tick de cpu)
+            
+            if (current_process->response_time == -1){ //si és la primera veg que s'executa -> necessitem calcular el temps de resposta per fer les metriques
+                current_process->response_time = t - current_process->arrive_time; 
+            }
+                             //aquesta funció ens dona les ràfegues del procés 
+            int burst_done = getCurrentBurst(current_process, t + 1);
+            
+            if (burst_done >= current_process->burst){  //si el procés ha acabat...
+                current_process->completed = true; 
+                current_process->return_time = t + 1 - current_process->arrive_time;
+                current_process = NULL;
+                quantum_counter = 0;
+            }
+        }
+
+        bool all_done = true; //revisem si tots els processos han acabat 
+        for (int p = 0; p < nprocs; p++){
+            if (!procTable[p].completed){
+                all_done = false;
+                break;
+            }
+        }
+        if (all_done){
+            actual_duration = t + 1;
+            break;
+        }
+    }
+   
+
+    for (int p = 0; p < nprocs; p++){ //per calcular les metriques
+        procTable[p].waiting_time = procTable[p].return_time - procTable[p].burst;
+    }
+
     printSimulation(nprocs,procTable,duration);
+    printMetrics(actual_duration, nprocs, procTable);
 
     for (int p=0; p<nprocs; p++ ){
         destroyProcess(procTable[p]);
@@ -95,9 +149,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
     cleanQueue();
     return EXIT_SUCCESS;
-
 }
-
 
 void printSimulation(size_t nprocs, Process *procTable, size_t duration){
 
