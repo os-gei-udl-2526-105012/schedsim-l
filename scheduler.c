@@ -74,7 +74,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     qsort(procTable,nprocs,sizeof(Process),compareArrival);
 
     init_queue();
-    size_t duration = getTotalCPU(procTable, nprocs) +1;
+    size_t duration = getTotalCPU(procTable, nprocs) +100;
 
     for (int p=0; p<nprocs; p++ ){
         procTable[p].lifecycle = malloc( duration * sizeof(int));
@@ -83,7 +83,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         }
         procTable[p].waiting_time = 0;
         procTable[p].return_time = 0;
-        procTable[p].response_time = 0;
+        procTable[p].response_time = -1;
         procTable[p].completed = false;
     }
 
@@ -102,6 +102,33 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         if (algorithm == FCFS){  //utilitzem els ifs segons quin tipus sigui
             if (current_process == NULL && get_queue_size() > 0){
                 current_process = dequeue();
+            }
+        }
+
+        else if (algorithm == SJF && modality == NONPREEMPTIVE){ //xq tmb tenim el SJF arpopiatiu 
+            if (current_process == NULL && get_queue_size() > 0){ //Si no hi ha procés executant-se (xq no és apropiatiu)
+                size_t queue_size = get_queue_size();
+                Process* shortest = NULL; //per a guardar el procés amb el burst + petit. 
+                int min_burst = 9999;
+                
+                Process** temp_queue = malloc(queue_size * sizeof(Process*));
+                for (size_t i = 0; i < queue_size; i++){
+                    temp_queue[i] = dequeue();     //DESAPILEM de la cua per apilar a un array i anar buscant el burst + petit
+                    if (temp_queue[i]->burst < min_burst){
+                        min_burst = temp_queue[i]->burst;
+                        shortest = temp_queue[i];
+                    }
+                }
+                
+                current_process = shortest; //el marquem com a current per executar-lo
+                
+                for (size_t i = 0; i < queue_size; i++){
+                    if (temp_queue[i] != shortest){
+                        enqueue(temp_queue[i]); //fem enqueue de tots els processos que hem tret menys el shortest
+                    }
+                }
+                
+                free(temp_queue); //alliberem l'array temporal per recorrer, no el necessitem per res 
             }
         }
         
@@ -140,7 +167,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].waiting_time = procTable[p].return_time - procTable[p].burst;
     }
 
-    printSimulation(nprocs,procTable,duration);
+    printSimulation(nprocs,procTable,actual_duration);
     printMetrics(actual_duration, nprocs, procTable);
 
     for (int p=0; p<nprocs; p++ ){
