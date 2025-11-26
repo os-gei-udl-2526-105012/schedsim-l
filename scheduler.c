@@ -131,6 +131,33 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                 free(temp_queue); //alliberem l'array temporal per recorrer, no el necessitem per res 
             }
         }
+
+        else if (algorithm == PRIORITIES && modality == NONPREEMPTIVE){
+            if (current_process == NULL && get_queue_size() > 0){ //si la cpu està lliure... (xq no és apropiatiu)
+                size_t queue_size = get_queue_size();
+                Process* highest = NULL;
+                int min_priority = 9999; //perquè busquem la més petita (+petita = +importancia)
+                
+                Process** temp_queue = malloc(queue_size * sizeof(Process*));
+                for (size_t i = 0; i < queue_size; i++){
+                    temp_queue[i] = dequeue(); //la cua de preparats es desencua i va a array temporal
+                    if (temp_queue[i]->priority < min_priority){  
+                        min_priority = temp_queue[i]->priority; 
+                        highest = temp_queue[i];
+                    }
+                }
+                
+                current_process = highest;
+                
+                for (size_t i = 0; i < queue_size; i++){
+                    if (temp_queue[i] != highest){
+                        enqueue(temp_queue[i]);
+                    }
+                }
+                
+                free(temp_queue);
+            }
+        }
         
         if (current_process != NULL){
             current_process->lifecycle[t] = Running; //ho necessitem per fer el diagrama (marcar les E en cada tick de cpu)
