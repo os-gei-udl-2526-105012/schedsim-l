@@ -158,12 +158,37 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                 free(temp_queue);
             }
         }
+
+        else if (algorithm == RR){
+                                   //aqui a més, tenim en compte si el quantum ha acabat            
+            if (current_process == NULL || quantum_counter >= quantum){
+                
+                if (current_process != NULL){
+                    int burst_done = getCurrentBurst(current_process, t);
+                    if (burst_done < current_process->burst){
+                        enqueue(current_process); //es retorna a la cola si el procés encara no ha acabat 
+                    }
+                }
+                
+                if (get_queue_size() > 0){ //per treure el següent procés 
+                    current_process = dequeue(); 
+                    quantum_counter = 0;
+                } else {
+                    current_process = NULL;
+                    quantum_counter = 0;
+                }
+            }
+        }
         
         if (current_process != NULL){
             current_process->lifecycle[t] = Running; //ho necessitem per fer el diagrama (marcar les E en cada tick de cpu)
             
             if (current_process->response_time == -1){ //si és la primera veg que s'executa -> necessitem calcular el temps de resposta per fer les metriques
                 current_process->response_time = t - current_process->arrive_time; 
+            }
+            
+            if (algorithm == RR){ //(especialment pel RR, xq per cada tick incremento els quantums utilitzats)
+                quantum_counter++;
             }
                              //aquesta funció ens dona les ràfegues del procés 
             int burst_done = getCurrentBurst(current_process, t + 1);
