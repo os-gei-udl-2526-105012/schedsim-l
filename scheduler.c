@@ -105,32 +105,75 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             }
         }
 
-        else if (algorithm == SJF && modality == NONPREEMPTIVE){ //xq tmb tenim el SJF arpopiatiu 
-            if (current_process == NULL && get_queue_size() > 0){ //Si no hi ha procés executant-se (xq no és apropiatiu)
-                size_t queue_size = get_queue_size();
-                Process* shortest = NULL; //per a guardar el procés amb el burst + petit. 
-                int min_burst = 9999;
+        else if (algorithm == SJF){ 
+            if (modality == NONPREEMPTIVE && get_queue_size() > 0){ 
+                if (current_process == NULL && get_queue_size() > 0){ //Si no hi ha procés executant-se (xq no és apropiatiu)
+                    size_t queue_size = get_queue_size();
+                    Process* shortest = NULL; //per a guardar el procés amb el burst + petit. 
+                    int min_burst = 9999;
                 
-                Process** temp_queue = malloc(queue_size * sizeof(Process*));
-                for (size_t i = 0; i < queue_size; i++){
-                    temp_queue[i] = dequeue();     //DESAPILEM de la cua per apilar a un array i anar buscant el burst + petit
-                    if (temp_queue[i]->burst < min_burst){
-                        min_burst = temp_queue[i]->burst;
-                        shortest = temp_queue[i];
+                    Process** temp_queue = malloc(queue_size * sizeof(Process*));
+                    for (size_t i = 0; i < queue_size; i++){
+                        temp_queue[i] = dequeue();     //DESAPILEM de la cua per apilar a un array i anar buscant el burst + petit
+                        if (temp_queue[i]->burst < min_burst){
+                            min_burst = temp_queue[i]->burst;
+                            shortest = temp_queue[i];
+                        }
                     }
-                }
                 
-                current_process = shortest; //el marquem com a current per executar-lo
+                    current_process = shortest; //el marquem com a current per executar-lo
                 
-                for (size_t i = 0; i < queue_size; i++){
-                    if (temp_queue[i] != shortest){
-                        enqueue(temp_queue[i]); //fem enqueue de tots els processos que hem tret menys el shortest
+                    for (size_t i = 0; i < queue_size; i++){
+                        if (temp_queue[i] != shortest){
+                            enqueue(temp_queue[i]); //fem enqueue de tots els processos que hem tret menys el shortest
+                        }
                     }
-                }
                 
-                free(temp_queue); //alliberem l'array temporal per recorrer, no el necessitem per res 
+                    free(temp_queue); //alliberem l'array temporal per recorrer, no el necessitem per res 
+                }
+            }
+            else { //si entra aqui -> apropiatiu
+                if (get_queue_size() > 0){
+                    size_t queue_size = get_queue_size();
+                    Process* shortest = NULL;
+                    int min_remaining = 9999;//inicialitzem amb valor molt alt x trobar el min.
+            
+                    Process** temp_queue = malloc(queue_size * sizeof(Process*));
+                    for (size_t i = 0; i < queue_size; i++){
+                        temp_queue[i] = dequeue();
+                        int remaining = temp_queue[i]->burst - getCurrentBurst(temp_queue[i], t);
+                        if (remaining < min_remaining){
+                            min_remaining = remaining;
+                            shortest = temp_queue[i]; //part imp., guardem el procés amb menys temps restant
+                        }
+                    }
+
+                    if (current_process != NULL){ //(part principal per la part apropiativa)
+                        int current_remaining = current_process->burst - getCurrentBurst(current_process, t);
+                        // Si el procés de la cua té menys temps restant, EXPROPIEM
+                        if (min_remaining < current_remaining){
+                            enqueue(current_process); // Expropiem
+                            current_process = shortest;
+                        } else {
+                            enqueue(shortest); //l'actual segueix
+                        }
+                    } else {
+                        // Si no hi ha cap procés executant-se --> agafem el de menor temps restant
+                        current_process = shortest;
+                    }
+            
+            
+                    for (size_t i = 0; i < queue_size; i++){
+                        if (temp_queue[i] != shortest){
+                            enqueue(temp_queue[i]);
+                        }
+                    }   
+            
+                    free(temp_queue);
+                }
             }
         }
+    
 
         else if (algorithm == PRIORITIES && modality == NONPREEMPTIVE){
             if (current_process == NULL && get_queue_size() > 0){ //si la cpu està lliure... (xq no és apropiatiu)
@@ -170,7 +213,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                     }
                 }
                 
-                if (get_queue_size() > 0){ //per treure el següent procés 
+                if (get_queue_size() > 0){ 
                     current_process = dequeue(); 
                     quantum_counter = 0;
                 } else {
